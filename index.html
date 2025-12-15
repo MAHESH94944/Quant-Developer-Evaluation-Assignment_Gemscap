@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Binance Futures Collector — Save NDJSON</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #0b0f14;
+        color: #e6edf3;
+      }
+      .card {
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 16px;
+        padding: 16px;
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      input,
+      button {
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: #e6edf3;
+      }
+      button.primary {
+        background: #0ea5e9;
+        color: #0b0f14;
+        font-weight: 600;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .log {
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 12px;
+        height: 320px;
+        overflow: auto;
+        white-space: pre;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2 style="margin-top: 0">
+        Binance Futures Collector — Save NDJSON (no network)
+      </h2>
+      <div class="row">
+        <div>
+          <label>Symbols (comma-separated, lowercase)</label>
+          <input id="symbols" value="btcusdt,ethusdt" />
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            justify-content: flex-end;
+          "
+        >
+          <button id="start" class="primary">Start</button>
+          <button id="stop">Stop</button>
+          <button id="download">Download NDJSON</button>
+          <button id="clear">Clear</button>
+        </div>
+      </div>
+      <p id="stats">Buffered: 0</p>
+      <div class="log" id="log"></div>
+    </div>
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        let sockets = [],
+          buffer = [],
+          running = false;
+        function log(m) {
+          const ts = new Date().toISOString();
+          $("log").textContent += `[${ts}] ${m}\n`;
+          $("log").scrollTop = $("log").scrollHeight;
+        }
+        function update() {
+          $("stats").textContent = `Buffered: ${buffer.length}`;
+        }
+        function normalize(j) {
+          const ts = new Date(j.T || j.E).toISOString();
+          return { symbol: j.s, ts, price: Number(j.p), size: Number(j.q) };
+        }
+        $("start").onclick = () => {
+          if (running) return;
+          running = true;
+          const syms = $("symbols")
+            .value.split(",")
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
+          if (!syms.length) {
+            log("No symbols");
+            return;
+          }
+          sockets = syms.map((sym) => {
+            const url = `wss://fstream.binance.com/ws/${sym}@trade`;
+            const ws = new WebSocket(url);
+            ws.onopen = () => log(`WS connected: ${sym}`);
+            ws.onmessage = (ev) => {
+              try {
+                const j = JSON.parse(ev.data);
+                if (j.e === "trade") {
+                  buffer.push(normalize(j));
+                  update();
+                }
+              } catch (e) {}
+            };
+            ws.onclose = (ev) => log(`WS closed ${sym} code=${ev.code}`);
+            ws.onerror = (ev) => log(`WS error ${sym}`);
+            return ws;
+          });
+        };
+        $("stop").onclick = () => {
+          sockets.forEach((ws) => {
+            try {
+              ws.close(1000, "user stop");
+            } catch {}
+          });
+          sockets = [];
+          running = false;
+          log("Stopped.");
+        };
+        $("download").onclick = () => {
+          const ndjson = buffer.map((x) => JSON.stringify(x)).join("\n");
+          const blob = new Blob([ndjson], { type: "application/x-ndjson" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          const ts = new Date().toISOString().replaceAll(":", "-");
+          a.download = `ticks_${ts}.ndjson`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        };
+        $("clear").onclick = () => {
+          buffer = [];
+          update();
+          log("Cleared buffer.");
+        };
+      })();
+    </script>
+  </body>
+</html>

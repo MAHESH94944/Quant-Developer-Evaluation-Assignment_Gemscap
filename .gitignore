@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+.env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+quant-analytics-app/run.log
+
+# Local databases (generated at runtime)
+quant-analytics-app/db/*.db
+quant-analytics-app/db/*.db-wal
+quant-analytics-app/db/*.db-shm
+
+# Local data outputs (generated)
+quant-analytics-app/data/processed/
+
+# Raw tick captures can be large; keep folder but ignore contents by default
+quant-analytics-app/data/raw/*.ndjson
+quant-analytics-app/*.ndjson
+
+# Streamlit cache
+.streamlit/
+
+# Node (if any frontend experiments)
+node_modules/
